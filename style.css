@@ -9,10 +9,10 @@ body {
   width: 100%;
   margin: 0;
   font-family: "Comic Sans MS", cursive, sans-serif;
+  text-align: center;
 }
 
 .header {
-  text-align: center;
   color: black;
   
 }
@@ -30,6 +30,10 @@ body {
   cursor: pointer;
   border-radius: 12px;
   font-family: "Comic Sans Ms", sans-serif;
+}
+
+.vote:hover{
+  background-color: #ff5252;
 }
 
 .jump-scare {
