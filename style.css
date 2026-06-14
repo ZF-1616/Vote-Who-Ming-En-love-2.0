@@ -14,7 +14,30 @@ body {
 
 .header {
   color: black;
-  
+}
+
+.login {
+  padding: 5px;
+}
+
+#username {
+  border: #eeeec3 3px solid;
+  border-radius: 5px;
+  background-color: #f5f5dc;
+  padding: 5px;
+}
+
+.join {
+  background-color: #e9e9af;
+  border: #e3e39c 3px solid;
+  border-radius: 5px;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.join:hover {
+  background-color: #eeeec3;
+  border: #eeeec3 3px solid;
 }
 
 .vote {
@@ -29,6 +52,8 @@ body {
   margin: 4px 2px;
   cursor: pointer;
   border-radius: 12px;
+  transition: background-color 0.3s ease;
+  width: 100px;
   font-family: "Comic Sans Ms", sans-serif;
 }
 
@@ -55,3 +80,4 @@ body {
   background: rgba(0, 0, 0, 0.5);
   z-index: 999;
 }
+
