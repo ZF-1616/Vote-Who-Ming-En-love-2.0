@@ -22,6 +22,10 @@ body {
     linear-gradient(160deg, #07101d 0%, #111b2f 100%);
 }
 
+a {
+  text-decoration: none;
+}
+
 .page-shell {
   max-width: 1100px;
   margin: 0 auto;
@@ -67,11 +71,7 @@ body {
   gap: 24px;
   align-items: start;
   padding-top: 18px;
-}
-
-.main {
   text-align: center;
-  
 }
 
 .card {
@@ -320,6 +320,15 @@ saved-users {
   max-height: 90vh;
   border-radius: 24px;
   box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7);
+}
+
+.p-bottom {
+  color: white;
+}
+
+.small a,
+.team:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 840px) {
