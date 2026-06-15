@@ -19,12 +19,17 @@
 
     <main class="main-grid">
       <section class="card login-card" id="login-card">
-        <h2>Enter your name</h2>
+        <h2>Member Login</h2>
         <div class="form-row">
-          <label for="login-username">Name</label>
-          <input type="text" id="login-username" placeholder="Enter your name" autocomplete="name" />
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username" />
         </div>
-        <button class="primary-btn" onclick="startVoting()">Start voting</button>
+        <div class="form-row">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" />
+        </div>
+        <button class="primary-btn" onclick="login()">Enter the vote</button>
+        <p class="small">New here? <a href="signup.html">Create your account</a></p>
         <div class="message" id="login-message"></div>
       </section>
 

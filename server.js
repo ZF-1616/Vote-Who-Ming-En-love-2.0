@@ -90,7 +90,18 @@ const server = http.createServer((req, res) => {
 
   if (method === "GET" && url === "/votes") {
     const votes = loadVotes();
-    sendJson(res, 200, votes);
+    const publicVotes = Object.keys(votes).reduce((result, key) => {
+      const user = votes[key];
+      result[key] = {
+        username: user.username,
+        latestVote: user.latestVote || null,
+        history: Array.isArray(user.history) ? user.history : [],
+        baitCount: user.baitCount || 0,
+      };
+      return result;
+    }, {});
+
+    sendJson(res, 200, publicVotes);
     return;
   }
 
@@ -117,6 +128,7 @@ const server = http.createServer((req, res) => {
         const key = username.toLowerCase();
         const user = votes[key] || {
           username,
+          password: null,
           history: [],
           baitCount: 0,
           latestVote: null,
@@ -139,6 +151,82 @@ const server = http.createServer((req, res) => {
         saveVotes(votes);
 
         sendJson(res, 200, { success: true, baitCount: user.baitCount });
+      } catch (err) {
+        sendJson(res, 500, { error: "Invalid request payload." });
+      }
+    });
+
+    return;
+  }
+
+  if (method === "POST" && url === "/signup") {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+
+    req.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        const username = String(payload.username || "").trim();
+        const password = String(payload.password || "");
+
+        if (!username || !password) {
+          sendJson(res, 400, { error: "Missing username or password." });
+          return;
+        }
+
+        const votes = loadVotes();
+        const key = username.toLowerCase();
+        if (votes[key] && votes[key].password) {
+          sendJson(res, 409, { error: "Username already exists." });
+          return;
+        }
+
+        votes[key] = {
+          username,
+          password,
+          history: [],
+          baitCount: 0,
+          latestVote: null,
+        };
+        saveVotes(votes);
+        sendJson(res, 200, { success: true });
+      } catch (err) {
+        sendJson(res, 500, { error: "Invalid request payload." });
+      }
+    });
+
+    return;
+  }
+
+  if (method === "POST" && url === "/login") {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+
+    req.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        const username = String(payload.username || "").trim();
+        const password = String(payload.password || "");
+
+        if (!username || !password) {
+          sendJson(res, 400, { error: "Missing username or password." });
+          return;
+        }
+
+        const votes = loadVotes();
+        const key = username.toLowerCase();
+        const user = votes[key];
+
+        if (!user || user.password !== password) {
+          sendJson(res, 401, { error: "Invalid credentials." });
+          return;
+        }
+
+        sendJson(res, 200, { success: true, username: user.username });
       } catch (err) {
         sendJson(res, 500, { error: "Invalid request payload." });
       }

@@ -2,6 +2,8 @@ const SESSION_USER_KEY = "voteWhoMing_currentUser";
 const VOTE_PREVIOUS_KEY = "voteWhoMing_previousVote";
 const VOTE_ENDPOINT = "/vote";
 const VOTES_ENDPOINT = "/votes";
+const LOGIN_ENDPOINT = "/login";
+const SIGNUP_ENDPOINT = "/signup";
 
 window.addEventListener("load", () => {
   if (document.body.contains(document.getElementById("login-card"))) {
@@ -29,18 +31,74 @@ function clearSession() {
   sessionStorage.removeItem(VOTE_PREVIOUS_KEY);
 }
 
-function startVoting() {
+async function login() {
   const username = document.getElementById("login-username").value.trim();
+  const password = document.getElementById("login-password").value;
   const message = document.getElementById("login-message");
   message.textContent = "";
 
-  if (!username) {
-    message.textContent = "Please enter your name to vote.";
+  if (!username || !password) {
+    message.textContent = "Please enter both username and password.";
     return;
   }
 
-  setSession(username);
-  showVotePanel(username);
+  try {
+    const response = await fetch(LOGIN_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Login failed.");
+    }
+
+    setSession(data.username);
+    showVotePanel(data.username);
+  } catch (err) {
+    message.textContent = err.message;
+  }
+}
+
+async function signup() {
+  const username = document.getElementById("signup-username").value.trim();
+  const password = document.getElementById("signup-password").value;
+  const confirm = document.getElementById("signup-confirm").value;
+  const message = document.getElementById("signup-message");
+  message.textContent = "";
+
+  if (!username || !password || !confirm) {
+    message.textContent = "Fill in every field to create an account.";
+    return;
+  }
+
+  if (password.length < 6) {
+    message.textContent = "Use at least 6 characters for your password.";
+    return;
+  }
+
+  if (password !== confirm) {
+    message.textContent = "Passwords do not match. Try again.";
+    return;
+  }
+
+  try {
+    const response = await fetch(SIGNUP_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Sign up failed.");
+    }
+
+    window.location.href = "index.html";
+  } catch (err) {
+    message.textContent = err.message;
+  }
 }
 
 function showVotePanel(username) {
@@ -108,12 +166,11 @@ async function vote(choice) {
       body: JSON.stringify(payload),
     });
 
+    const data = await response.json();
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || "Failed to save vote.");
+      throw new Error(data.error || "Failed to save vote.");
     }
 
-    const result = await response.json();
     sessionStorage.setItem(VOTE_PREVIOUS_KEY, choice);
     setSelectedVote(choice);
 
@@ -123,7 +180,7 @@ async function vote(choice) {
     }
 
     if (feedback) {
-      feedback.textContent = `Thanks, ${username}! Your vote has been saved.${result.baitCount > 0 ? " You fell for the bait." : ""}`;
+      feedback.textContent = `Thanks, ${username}! Your vote has been saved.${data.baitCount > 0 ? " You fell for the bait." : ""}`;
     }
   } catch (err) {
     if (feedback) {
@@ -163,7 +220,7 @@ async function renderSecretPage() {
       .map((user) => {
         const history = Array.isArray(user.history) && user.history.length ? user.history.join(", ") : "NO VOTE";
         const baitSuffix = user.baitCount > 0 ? ` (fell for bait ${user.baitCount} ${user.baitCount === 1 ? "time" : "times"})` : "";
-        return `<div class="secret-row"><span>${user.username}</span><span>${history}${baitSuffix}</span></div>`;
+        return `<div class="secret-row"><span>${user.username}</span><span>${user.latestVote || "none"}</span><span>${history}${baitSuffix}</span></div>`;
       })
       .join("");
 
