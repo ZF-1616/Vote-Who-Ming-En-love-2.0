@@ -1,131 +1,44 @@
-const USERS_KEY = "voteWhoMing_users";
-const CURRENT_USER_KEY = "voteWhoMing_currentUser";
-const VOTE_KEY = "voteWhoMing_votes";
+const SESSION_USER_KEY = "voteWhoMing_currentUser";
+const VOTE_PREVIOUS_KEY = "voteWhoMing_previousVote";
 
 window.addEventListener("load", () => {
   if (document.body.contains(document.getElementById("login-card"))) {
-    initializeLoginPage();
+    initializeVotePage();
   }
 });
 
-function loadUsers() {
-  const stored = localStorage.getItem(USERS_KEY);
-  return stored ? JSON.parse(stored) : {};
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+function initializeVotePage() {
+  const username = getSession();
+  if (username) {
+    showVotePanel(username);
+  }
 }
 
 function getSession() {
-  return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || "null");
+  return sessionStorage.getItem(SESSION_USER_KEY);
 }
 
 function setSession(username) {
-  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify({ username }));
+  sessionStorage.setItem(SESSION_USER_KEY, username);
 }
 
 function clearSession() {
-  localStorage.removeItem(CURRENT_USER_KEY);
+  sessionStorage.removeItem(SESSION_USER_KEY);
+  sessionStorage.removeItem(VOTE_PREVIOUS_KEY);
 }
 
-function initializeLoginPage() {
-  const session = getSession();
-  renderSavedUsers();
-
-  if (session && session.username) {
-    showVotePanel(session.username);
-  }
-}
-
-function renderSavedUsers() {
-  const users = loadUsers();
-  const savedUsersEl = document.getElementById("saved-users");
-
-  if (!savedUsersEl) return;
-
-  const keys = Object.keys(users);
-  if (!keys.length) {
-    savedUsersEl.innerHTML = "<p class='small'>No saved usernames yet. Sign up to start saving accounts.</p>";
-    return;
-  }
-
-  const names = keys
-    .sort()
-    .map((key) => `<button type="button" class="saved-user-btn" onclick="fillUsername('${users[key].username}')">${users[key].username}</button>`)
-    .join("");
-
-  savedUsersEl.innerHTML = `<p class='small'>Saved usernames:</p><div class='saved-user-list'>${names}</div>`;
-}
-
-function fillUsername(value) {
-  const usernameInput = document.getElementById("login-username");
-  if (usernameInput) {
-    usernameInput.value = value;
-  }
-}
-
-function login() {
+function startVoting() {
   const username = document.getElementById("login-username").value.trim();
-  const password = document.getElementById("login-password").value;
   const message = document.getElementById("login-message");
   message.textContent = "";
 
-  if (!username || !password) {
-    message.textContent = "Please enter both username and password.";
+  if (!username) {
+    message.textContent = "Please enter your name to vote.";
     return;
   }
 
-  const users = loadUsers();
-  const user = users[username.toLowerCase()];
-
-  if (!user || user.password !== password) {
-    message.textContent = "Login failed. Check your credentials or sign up first.";
-    return;
-  }
-
-  setSession(user.username);
-  renderSavedUsers();
-  showVotePanel(user.username);
-}
-
-function signup() {
-  const username = document.getElementById("signup-username").value.trim();
-  const password = document.getElementById("signup-password").value;
-  const confirm = document.getElementById("signup-confirm").value;
-  const message = document.getElementById("signup-message");
-  message.textContent = "";
-
-  if (!username || !password || !confirm) {
-    message.textContent = "Fill in every field to create an account.";
-    return;
-  }
-
-  if (password.length < 6) {
-    message.textContent = "Use at least 6 characters for your password.";
-    return;
-  }
-
-  if (password !== confirm) {
-    message.textContent = "Passwords do not match. Try again.";
-    return;
-  }
-
-  const users = loadUsers();
-  const key = username.toLowerCase();
-
-  if (users[key]) {
-    message.textContent = "That username is already taken. Choose another one.";
-    return;
-  }
-
-  users[key] = { username, password, vote: null, history: [], baitCount: 0 };
-  saveUsers(users);
-  message.textContent = "Account created successfully. Redirecting to login...";
-
-  setTimeout(() => {
-    window.location.href = "index.html";
-  }, 1200);
+  setSession(username);
+  showVotePanel(username);
 }
 
 function showVotePanel(username) {
@@ -133,8 +46,7 @@ function showVotePanel(username) {
   const voteCard = document.getElementById("vote-card");
   const greeting = document.getElementById("greeting");
   const previousChoice = document.getElementById("previous-choice");
-  const users = loadUsers();
-  const user = users[username.toLowerCase()];
+  const previousVote = sessionStorage.getItem(VOTE_PREVIOUS_KEY);
 
   if (loginCard) {
     loginCard.classList.add("hidden");
@@ -145,12 +57,11 @@ function showVotePanel(username) {
   if (greeting) {
     greeting.textContent = `Welcome, ${username}`;
   }
-
   if (previousChoice) {
-    previousChoice.textContent = user && user.vote ? user.vote : "none";
+    previousChoice.textContent = previousVote || "none";
   }
 
-  setSelectedVote(user?.vote || null);
+  setSelectedVote(previousVote);
 }
 
 function logout() {
@@ -159,63 +70,39 @@ function logout() {
 }
 
 function vote(choice) {
-  const session = getSession();
+  const username = getSession();
   const feedback = document.getElementById("vote-feedback");
 
-  if (!session || !session.username) {
-    feedback.textContent = "Please log in before voting.";
-    return;
-  }
-
-  const users = loadUsers();
-  const userKey = session.username.toLowerCase();
-  const user = users[userKey] || { username: session.username, password: "", vote: null, history: [], baitCount: 0 };
-  const votes = JSON.parse(localStorage.getItem(VOTE_KEY) || "{}");
-
-  if (!votes.total) {
-    votes.total = 0;
-  }
-
-  const previousVote = user.vote || null;
-  if (previousVote === choice) {
-    setSelectedVote(choice);
-    const previousChoice = document.getElementById("previous-choice");
-    if (previousChoice) {
-      previousChoice.textContent = choice;
+  if (!username) {
+    if (feedback) {
+      feedback.textContent = "Please enter your name before voting.";
     }
-    feedback.textContent = `You already selected ${choice}.`;
     return;
   }
 
-  if (previousVote) {
-    votes[previousVote] = Math.max((votes[previousVote] || 1) - 1, 0);
-  } else {
-    votes.total += 1;
+  const previousVote = sessionStorage.getItem(VOTE_PREVIOUS_KEY);
+
+  if (previousVote === choice) {
+    if (feedback) {
+      feedback.textContent = `You already selected ${choice}.`;
+    }
+    setSelectedVote(choice);
+    return;
   }
 
-  votes[choice] = (votes[choice] || 0) + 1;
-  localStorage.setItem(VOTE_KEY, JSON.stringify(votes));
-
-  if (!Array.isArray(user.history)) {
-    user.history = [];
-  }
-  if (user.history.length === 0 || user.history[user.history.length - 1] !== choice) {
-    user.history.push(choice);
-  }
-
-  if (choice === "D. DON'T CLICK !!!") {
-    user.baitCount = (user.baitCount || 0) + 1;
-  }
-
-  user.vote = choice;
-  users[userKey] = user;
-  saveUsers(users);
-
-  feedback.textContent = `Thanks, ${session.username}! You voted for ${choice}. Total voters: ${votes.total}.`;
+  sessionStorage.setItem(VOTE_PREVIOUS_KEY, choice);
   setSelectedVote(choice);
+
   const previousChoice = document.getElementById("previous-choice");
   if (previousChoice) {
     previousChoice.textContent = choice;
+  }
+
+  const baited = choice === "D. DON'T CLICK !!!";
+  downloadSqlFile(username, choice, baited, Boolean(previousVote));
+
+  if (feedback) {
+    feedback.textContent = `Thanks, ${username}! Your vote has been recorded.${baited ? " You fell for the bait." : ""}`;
   }
 }
 
@@ -230,46 +117,48 @@ function setSelectedVote(choice) {
   });
 }
 
-function jumpscare() {
-  const jumpScare = document.getElementById("jump-scare");
-  const audio = document.getElementById("jump-scare-audio");
+function downloadSqlFile(username, choice, baited, isUpdate) {
+  const escapedUser = escapeSqlString(username);
+  const escapedChoice = escapeSqlString(choice);
+  const baitValue = baited ? 1 : 0;
+  const header = `-- Vote file generated for ${escapedUser}\n`;
+  const sql = isUpdate
+    ? `${header}UPDATE votes\nSET choice = '${escapedChoice}', baited = ${baitValue}, updated_at = CURRENT_TIMESTAMP\nWHERE username = '${escapedUser}';\n`
+    : `${header}INSERT INTO votes (username, choice, baited, created_at)\nVALUES ('${escapedUser}', '${escapedChoice}', ${baitValue}, CURRENT_TIMESTAMP);\n`;
 
-  if (audio) {
-    audio.currentTime = 0;
-    audio.play().catch(() => {
-      // user interaction needed for autoplay in some browsers
-    });
-  }
+  const filename = `vote-${sanitizeFilename(username)}-${Date.now()}.sql`;
+  const blob = new Blob([sql], { type: "text/sql" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
 
-  if (!jumpScare) return;
-  jumpScare.classList.add("visible");
-  setTimeout(() => {
-    jumpScare.classList.remove("visible");
-  }, 2000);
+function escapeSqlString(value) {
+  return String(value).replace(/'/g, "''");
+}
+
+function sanitizeFilename(value) {
+  return String(value).trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
 }
 
 function renderSecretPage() {
-  const users = loadUsers();
   const list = document.getElementById("secret-list");
   const count = document.getElementById("secret-count");
   const notice = document.getElementById("secret-notice");
 
-  if (!list || !count) return;
-
-  const rows = Object.values(users)
-    .sort((a, b) => a.username.localeCompare(b.username))
-    .map((user) => {
-      const history = Array.isArray(user.history) && user.history.length ? user.history.join(",") : user.vote || "NO VOTE";
-      const baitCount = user.baitCount || 0;
-      const baitSuffix = baitCount > 0 ? ` (Fell for bait ${baitCount} ${baitCount === 1 ? "time" : "times"})` : "";
-      return `<div class="secret-row"><span>${user.username}</span><span>${history}${baitSuffix}</span></div>`;
-    })
-    .join("");
-
-  list.innerHTML = rows || "<p class='small'>No saved users.</p>";
-  count.textContent = `Stored accounts: ${Object.values(users).length}`;
+  if (list) {
+    list.innerHTML = "<p class='small'>This demo does not store vote records in local storage.</p>";
+  }
+  if (count) {
+    count.textContent = "No stored accounts.";
+  }
   if (notice) {
-    notice.textContent = `Fell for DON'T CLICK: ${Object.values(users).filter((u) => u.baitCount > 0).length}`;
+    notice.textContent = "Vote data is exported as SQL files instead.";
   }
 }
 

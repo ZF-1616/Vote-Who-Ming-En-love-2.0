@@ -19,18 +19,12 @@
 
     <main class="main-grid">
       <section class="card login-card" id="login-card">
-        <h2>Member Login</h2>
+        <h2>Enter your name</h2>
         <div class="form-row">
-          <label for="login-username">Username</label>
-          <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username" />
+          <label for="login-username">Name</label>
+          <input type="text" id="login-username" placeholder="Enter your name" autocomplete="name" />
         </div>
-        <div class="form-row">
-          <label for="login-password">Password</label>
-          <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" />
-        </div>
-        <button class="primary-btn" onclick="login()">Enter the vote</button>
-        <div class="saved-users" id="saved-users"></div>
-        <p class="small">New here? <a href="signup.html">Create your account</a></p>
+        <button class="primary-btn" onclick="startVoting()">Start voting</button>
         <div class="message" id="login-message"></div>
       </section>
 
@@ -55,16 +49,6 @@
         <div class="vote-feedback" id="vote-feedback"></div>
       </section>
     </main>
-      <div class="p-bottom">
-        <div class="version">
-          Version: beta 2.5.2
-        </div>
-        <a href="https://zf-1616.github.io/The-Loners/index.html">
-           <div class="team">
-              Made by The Loners
-           </div>
-        </a>
-      </div>
   </div>
 
   <div class="jump-scare" id="jump-scare">
