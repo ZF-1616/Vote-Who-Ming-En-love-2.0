@@ -69,6 +69,11 @@ body {
   padding-top: 18px;
 }
 
+.main {
+  text-align: center;
+  
+}
+
 .card {
   background: rgba(14, 24, 42, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.08);
