@@ -22,10 +22,6 @@ body {
     linear-gradient(160deg, #07101d 0%, #111b2f 100%);
 }
 
-a {
-  text-decoration: none;
-}
-
 .page-shell {
   max-width: 1100px;
   margin: 0 auto;
@@ -71,10 +67,6 @@ a {
   gap: 24px;
   align-items: start;
   padding-top: 18px;
-  text-align: center;
-  display: flex;
-  justify-content: center; /* 左右置中 */
-  align-items: center;     /* 上下置中 */
 }
 
 .card {
@@ -323,19 +315,6 @@ saved-users {
   max-height: 90vh;
   border-radius: 24px;
   box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7);
-}
-
-.p-bottom {
-  color: white;
-}
-
-.team {
-  color: #79b6ff;
-}
-
-.small a:hover,
-.team:hover {
-  text-decoration: underline;
 }
 
 @media (max-width: 840px) {

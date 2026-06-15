@@ -1,5 +1,7 @@
 const SESSION_USER_KEY = "voteWhoMing_currentUser";
 const VOTE_PREVIOUS_KEY = "voteWhoMing_previousVote";
+const VOTE_ENDPOINT = "/vote";
+const VOTES_ENDPOINT = "/votes";
 
 window.addEventListener("load", () => {
   if (document.body.contains(document.getElementById("login-card"))) {
@@ -69,7 +71,7 @@ function logout() {
   window.location.reload();
 }
 
-function vote(choice) {
+async function vote(choice) {
   const username = getSession();
   const feedback = document.getElementById("vote-feedback");
 
@@ -90,19 +92,43 @@ function vote(choice) {
     return;
   }
 
-  sessionStorage.setItem(VOTE_PREVIOUS_KEY, choice);
-  setSelectedVote(choice);
+  const payload = {
+    username,
+    choice,
+    previousVote,
+    baited: choice === "D. DON'T CLICK !!!",
+  };
 
-  const previousChoice = document.getElementById("previous-choice");
-  if (previousChoice) {
-    previousChoice.textContent = choice;
-  }
+  try {
+    const response = await fetch(VOTE_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
 
-  const baited = choice === "D. DON'T CLICK !!!";
-  downloadSqlFile(username, choice, baited, Boolean(previousVote));
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || "Failed to save vote.");
+    }
 
-  if (feedback) {
-    feedback.textContent = `Thanks, ${username}! Your vote has been recorded.${baited ? " You fell for the bait." : ""}`;
+    const result = await response.json();
+    sessionStorage.setItem(VOTE_PREVIOUS_KEY, choice);
+    setSelectedVote(choice);
+
+    const previousChoice = document.getElementById("previous-choice");
+    if (previousChoice) {
+      previousChoice.textContent = choice;
+    }
+
+    if (feedback) {
+      feedback.textContent = `Thanks, ${username}! Your vote has been saved.${result.baitCount > 0 ? " You fell for the bait." : ""}`;
+    }
+  } catch (err) {
+    if (feedback) {
+      feedback.textContent = `Error saving vote: ${err.message}`;
+    }
   }
 }
 
@@ -117,48 +143,41 @@ function setSelectedVote(choice) {
   });
 }
 
-function downloadSqlFile(username, choice, baited, isUpdate) {
-  const escapedUser = escapeSqlString(username);
-  const escapedChoice = escapeSqlString(choice);
-  const baitValue = baited ? 1 : 0;
-  const header = `-- Vote file generated for ${escapedUser}\n`;
-  const sql = isUpdate
-    ? `${header}UPDATE votes\nSET choice = '${escapedChoice}', baited = ${baitValue}, updated_at = CURRENT_TIMESTAMP\nWHERE username = '${escapedUser}';\n`
-    : `${header}INSERT INTO votes (username, choice, baited, created_at)\nVALUES ('${escapedUser}', '${escapedChoice}', ${baitValue}, CURRENT_TIMESTAMP);\n`;
-
-  const filename = `vote-${sanitizeFilename(username)}-${Date.now()}.sql`;
-  const blob = new Blob([sql], { type: "text/sql" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
-}
-
-function escapeSqlString(value) {
-  return String(value).replace(/'/g, "''");
-}
-
-function sanitizeFilename(value) {
-  return String(value).trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
-}
-
-function renderSecretPage() {
+async function renderSecretPage() {
   const list = document.getElementById("secret-list");
   const count = document.getElementById("secret-count");
   const notice = document.getElementById("secret-notice");
 
-  if (list) {
-    list.innerHTML = "<p class='small'>This demo does not store vote records in local storage.</p>";
-  }
-  if (count) {
-    count.textContent = "No stored accounts.";
-  }
-  if (notice) {
-    notice.textContent = "Vote data is exported as SQL files instead.";
+  if (!list || !count) return;
+
+  try {
+    const response = await fetch(VOTES_ENDPOINT);
+    if (!response.ok) {
+      throw new Error("Could not load saved votes.");
+    }
+
+    const votes = await response.json();
+    const entries = Object.values(votes).sort((a, b) => a.username.localeCompare(b.username));
+
+    const rows = entries
+      .map((user) => {
+        const history = Array.isArray(user.history) && user.history.length ? user.history.join(", ") : "NO VOTE";
+        const baitSuffix = user.baitCount > 0 ? ` (fell for bait ${user.baitCount} ${user.baitCount === 1 ? "time" : "times"})` : "";
+        return `<div class="secret-row"><span>${user.username}</span><span>${history}${baitSuffix}</span></div>`;
+      })
+      .join("");
+
+    list.innerHTML = rows || "<p class='small'>No saved votes yet.</p>";
+    count.textContent = `Saved voters: ${entries.length}`;
+    if (notice) {
+      notice.textContent = `This page reads vote data from the repository-backed server file.`;
+    }
+  } catch (err) {
+    list.innerHTML = `<p class='small'>${err.message}</p>`;
+    count.textContent = "Unable to load saved votes.";
+    if (notice) {
+      notice.textContent = "Make sure the local server is running.";
+    }
   }
 }
 
