@@ -1,3 +1,4 @@
+const USERS_KEY = "voteWhoMing_users";
 const SESSION_USER_KEY = "voteWhoMing_currentUser";
 const VOTE_PREVIOUS_KEY = "voteWhoMing_previousVote";
 const VOTE_ENDPOINT = "/vote";
@@ -57,7 +58,14 @@ async function login() {
     setSession(data.username);
     showVotePanel(data.username);
   } catch (err) {
-    message.textContent = err.message;
+    const users = loadUsers();
+    const user = users[username.toLowerCase()];
+    if (user && user.password === password) {
+      setSession(user.username);
+      showVotePanel(user.username);
+      return;
+    }
+    message.textContent = err.message || "Login failed.";
   }
 }
 
@@ -97,7 +105,22 @@ async function signup() {
 
     window.location.href = "index.html";
   } catch (err) {
-    message.textContent = err.message;
+    const users = loadUsers();
+    const key = username.toLowerCase();
+    if (users[key]) {
+      message.textContent = "Username already exists.";
+      return;
+    }
+
+    users[key] = {
+      username,
+      password,
+      history: [],
+      baitCount: 0,
+      latestVote: null,
+    };
+    saveUsers(users);
+    window.location.href = "index.html";
   }
 }
 
@@ -106,7 +129,8 @@ function showVotePanel(username) {
   const voteCard = document.getElementById("vote-card");
   const greeting = document.getElementById("greeting");
   const previousChoice = document.getElementById("previous-choice");
-  const previousVote = sessionStorage.getItem(VOTE_PREVIOUS_KEY);
+  const storedUser = loadUsers()[username.toLowerCase()];
+  const previousVote = sessionStorage.getItem(VOTE_PREVIOUS_KEY) || storedUser?.latestVote || null;
 
   if (loginCard) {
     loginCard.classList.add("hidden");
@@ -119,6 +143,10 @@ function showVotePanel(username) {
   }
   if (previousChoice) {
     previousChoice.textContent = previousVote || "none";
+  }
+
+  if (previousVote) {
+    sessionStorage.setItem(VOTE_PREVIOUS_KEY, previousVote);
   }
 
   setSelectedVote(previousVote);
@@ -183,8 +211,41 @@ async function vote(choice) {
       feedback.textContent = `Thanks, ${username}! Your vote has been saved.${data.baitCount > 0 ? " You fell for the bait." : ""}`;
     }
   } catch (err) {
+    const users = loadUsers();
+    const key = username.toLowerCase();
+    const user = users[key] || {
+      username,
+      password: null,
+      history: [],
+      baitCount: 0,
+      latestVote: null,
+    };
+
+    if (!user.history || !Array.isArray(user.history)) {
+      user.history = [];
+    }
+
+    if (!previousVote || previousVote !== choice) {
+      user.history.push(choice);
+    }
+
+    if (choice === "D. DON'T CLICK !!!") {
+      user.baitCount = (user.baitCount || 0) + 1;
+    }
+
+    user.latestVote = choice;
+    users[key] = user;
+    saveUsers(users);
+
+    sessionStorage.setItem(VOTE_PREVIOUS_KEY, choice);
+    setSelectedVote(choice);
+    const previousChoice = document.getElementById("previous-choice");
+    if (previousChoice) {
+      previousChoice.textContent = choice;
+    }
+
     if (feedback) {
-      feedback.textContent = `Error saving vote: ${err.message}`;
+      feedback.textContent = `Saved locally because the server is unavailable. Your vote is recorded in local storage.`;
     }
   }
 }
@@ -230,10 +291,20 @@ async function renderSecretPage() {
       notice.textContent = `This page reads vote data from the repository-backed server file.`;
     }
   } catch (err) {
-    list.innerHTML = `<p class='small'>${err.message}</p>`;
-    count.textContent = "Unable to load saved votes.";
+    const users = loadUsers();
+    const entries = Object.values(users).sort((a, b) => a.username.localeCompare(b.username));
+    const rows = entries
+      .map((user) => {
+        const history = Array.isArray(user.history) && user.history.length ? user.history.join(", ") : "NO VOTE";
+        const baitSuffix = user.baitCount > 0 ? ` (fell for bait ${user.baitCount} ${user.baitCount === 1 ? "time" : "times"})` : "";
+        return `<div class="secret-row"><span>${user.username}</span><span>${user.latestVote || "none"}</span><span>${history}${baitSuffix}</span></div>`;
+      })
+      .join("");
+
+    list.innerHTML = rows || "<p class='small'>No saved votes yet.</p>";
+    count.textContent = `Saved voters (local fallback): ${entries.length}`;
     if (notice) {
-      notice.textContent = "Make sure the local server is running.";
+      notice.textContent = "Showing saved votes from local storage because the server is unavailable.";
     }
   }
 }
