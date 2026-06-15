@@ -72,6 +72,9 @@ a {
   align-items: start;
   padding-top: 18px;
   text-align: center;
+  display: flex;
+  justify-content: center; /* 左右置中 */
+  align-items: center;     /* 上下置中 */
 }
 
 .card {
