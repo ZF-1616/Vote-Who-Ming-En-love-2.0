@@ -326,7 +326,11 @@ saved-users {
   color: white;
 }
 
-.small a,
+.team {
+  color: #79b6ff;
+}
+
+.small a:hover,
 .team:hover {
   text-decoration: underline;
 }
