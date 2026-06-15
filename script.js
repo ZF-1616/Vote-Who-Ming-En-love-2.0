@@ -1,38 +1,71 @@
-const USERS_KEY = "voteWhoMing_users";
-const SESSION_USER_KEY = "voteWhoMing_currentUser";
-const VOTE_PREVIOUS_KEY = "voteWhoMing_previousVote";
-const VOTE_ENDPOINT = "/vote";
-const VOTES_ENDPOINT = "/votes";
-const LOGIN_ENDPOINT = "/login";
-const SIGNUP_ENDPOINT = "/signup";
+﻿const USERS_KEY = "voteWhoMing_users";
+const CURRENT_USER_KEY = "voteWhoMing_currentUser";
+const VOTE_KEY = "voteWhoMing_votes";
 
 window.addEventListener("load", () => {
   if (document.body.contains(document.getElementById("login-card"))) {
-    initializeVotePage();
+    initializeLoginPage();
   }
 });
 
-function initializeVotePage() {
-  const username = getSession();
-  if (username) {
-    showVotePanel(username);
-  }
+function loadUsers() {
+  const stored = localStorage.getItem(USERS_KEY);
+  return stored ? JSON.parse(stored) : {};
+}
+
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
 
 function getSession() {
-  return sessionStorage.getItem(SESSION_USER_KEY);
+  return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || "null");
 }
 
 function setSession(username) {
-  sessionStorage.setItem(SESSION_USER_KEY, username);
+  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify({ username }));
 }
 
 function clearSession() {
-  sessionStorage.removeItem(SESSION_USER_KEY);
-  sessionStorage.removeItem(VOTE_PREVIOUS_KEY);
+  localStorage.removeItem(CURRENT_USER_KEY);
 }
 
-async function login() {
+function initializeLoginPage() {
+  const session = getSession();
+  renderSavedUsers();
+
+  if (session && session.username) {
+    showVotePanel(session.username);
+  }
+}
+
+function renderSavedUsers() {
+  const users = loadUsers();
+  const savedUsersEl = document.getElementById("saved-users");
+
+  if (!savedUsersEl) return;
+
+  const keys = Object.keys(users);
+  if (!keys.length) {
+    savedUsersEl.innerHTML = "<p class='small'>No saved usernames yet. Sign up to start saving accounts.</p>";
+    return;
+  }
+
+  const names = keys
+    .sort()
+    .map((key) => `<button type="button" class="saved-user-btn" onclick="fillUsername('${users[key].username}')">${users[key].username}</button>`)
+    .join("");
+
+  savedUsersEl.innerHTML = `<p class='small'>Saved usernames:</p><div class='saved-user-list'>${names}</div>`;
+}
+
+function fillUsername(value) {
+  const usernameInput = document.getElementById("login-username");
+  if (usernameInput) {
+    usernameInput.value = value;
+  }
+}
+
+function login() {
   const username = document.getElementById("login-username").value.trim();
   const password = document.getElementById("login-password").value;
   const message = document.getElementById("login-message");
@@ -43,33 +76,20 @@ async function login() {
     return;
   }
 
-  try {
-    const response = await fetch(LOGIN_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
+  const users = loadUsers();
+  const user = users[username.toLowerCase()];
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Login failed.");
-    }
-
-    setSession(data.username);
-    showVotePanel(data.username);
-  } catch (err) {
-    const users = loadUsers();
-    const user = users[username.toLowerCase()];
-    if (user && user.password === password) {
-      setSession(user.username);
-      showVotePanel(user.username);
-      return;
-    }
-    message.textContent = err.message || "Login failed.";
+  if (!user || user.password !== password) {
+    message.textContent = "Login failed. Check your credentials or sign up first.";
+    return;
   }
+
+  setSession(user.username);
+  renderSavedUsers();
+  showVotePanel(user.username);
 }
 
-async function signup() {
+function signup() {
   const username = document.getElementById("signup-username").value.trim();
   const password = document.getElementById("signup-password").value;
   const confirm = document.getElementById("signup-confirm").value;
@@ -91,37 +111,21 @@ async function signup() {
     return;
   }
 
-  try {
-    const response = await fetch(SIGNUP_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
+  const users = loadUsers();
+  const key = username.toLowerCase();
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Sign up failed.");
-    }
-
-    window.location.href = "index.html";
-  } catch (err) {
-    const users = loadUsers();
-    const key = username.toLowerCase();
-    if (users[key]) {
-      message.textContent = "Username already exists.";
-      return;
-    }
-
-    users[key] = {
-      username,
-      password,
-      history: [],
-      baitCount: 0,
-      latestVote: null,
-    };
-    saveUsers(users);
-    window.location.href = "index.html";
+  if (users[key]) {
+    message.textContent = "That username is already taken. Choose another one.";
+    return;
   }
+
+  users[key] = { username, password, vote: null, history: [], baitCount: 0 };
+  saveUsers(users);
+  message.textContent = "Account created successfully. Redirecting to login...";
+
+  setTimeout(() => {
+    window.location.href = "index.html";
+  }, 1200);
 }
 
 function showVotePanel(username) {
@@ -129,8 +133,8 @@ function showVotePanel(username) {
   const voteCard = document.getElementById("vote-card");
   const greeting = document.getElementById("greeting");
   const previousChoice = document.getElementById("previous-choice");
-  const storedUser = loadUsers()[username.toLowerCase()];
-  const previousVote = sessionStorage.getItem(VOTE_PREVIOUS_KEY) || storedUser?.latestVote || null;
+  const users = loadUsers();
+  const user = users[username.toLowerCase()];
 
   if (loginCard) {
     loginCard.classList.add("hidden");
@@ -141,15 +145,12 @@ function showVotePanel(username) {
   if (greeting) {
     greeting.textContent = `Welcome, ${username}`;
   }
+
   if (previousChoice) {
-    previousChoice.textContent = previousVote || "none";
+    previousChoice.textContent = user && user.vote ? user.vote : "none";
   }
 
-  if (previousVote) {
-    sessionStorage.setItem(VOTE_PREVIOUS_KEY, previousVote);
-  }
-
-  setSelectedVote(previousVote);
+  setSelectedVote(user?.vote || null);
 }
 
 function logout() {
@@ -157,96 +158,64 @@ function logout() {
   window.location.reload();
 }
 
-async function vote(choice) {
-  const username = getSession();
+function vote(choice) {
+  const session = getSession();
   const feedback = document.getElementById("vote-feedback");
 
-  if (!username) {
-    if (feedback) {
-      feedback.textContent = "Please enter your name before voting.";
-    }
+  if (!session || !session.username) {
+    feedback.textContent = "Please log in before voting.";
     return;
   }
 
-  const previousVote = sessionStorage.getItem(VOTE_PREVIOUS_KEY);
+  const users = loadUsers();
+  const userKey = session.username.toLowerCase();
+  const user = users[userKey] || { username: session.username, password: "", vote: null, history: [], baitCount: 0 };
+  const votes = JSON.parse(localStorage.getItem(VOTE_KEY) || "{}");
 
+  if (!votes.total) {
+    votes.total = 0;
+  }
+
+  const previousVote = user.vote || null;
   if (previousVote === choice) {
-    if (feedback) {
-      feedback.textContent = `You already selected ${choice}.`;
-    }
     setSelectedVote(choice);
+    const previousChoice = document.getElementById("previous-choice");
+    if (previousChoice) {
+      previousChoice.textContent = choice;
+    }
+    feedback.textContent = `You already selected ${choice}.`;
     return;
   }
 
-  const payload = {
-    username,
-    choice,
-    previousVote,
-    baited: choice === "D. DON'T CLICK !!!",
-  };
+  if (previousVote) {
+    votes[previousVote] = Math.max((votes[previousVote] || 1) - 1, 0);
+  } else {
+    votes.total += 1;
+  }
 
-  try {
-    const response = await fetch(VOTE_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+  votes[choice] = (votes[choice] || 0) + 1;
+  localStorage.setItem(VOTE_KEY, JSON.stringify(votes));
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to save vote.");
-    }
+  if (!Array.isArray(user.history)) {
+    user.history = [];
+  }
+  if (user.history.length === 0 || user.history[user.history.length - 1] !== choice) {
+    user.history.push(choice);
+  }
 
-    sessionStorage.setItem(VOTE_PREVIOUS_KEY, choice);
-    setSelectedVote(choice);
+  if (choice === "D. DON'T CLICK !!!") {
+    user.baitCount = (user.baitCount || 0) + 1;
+  }
 
-    const previousChoice = document.getElementById("previous-choice");
-    if (previousChoice) {
-      previousChoice.textContent = choice;
-    }
+  user.vote = choice;
+  users[userKey] = user;
+  saveUsers(users);
 
-    if (feedback) {
-      feedback.textContent = `Thanks, ${username}! Your vote has been saved.${data.baitCount > 0 ? " You fell for the bait." : ""}`;
-    }
-  } catch (err) {
-    const users = loadUsers();
-    const key = username.toLowerCase();
-    const user = users[key] || {
-      username,
-      password: null,
-      history: [],
-      baitCount: 0,
-      latestVote: null,
-    };
-
-    if (!user.history || !Array.isArray(user.history)) {
-      user.history = [];
-    }
-
-    if (!previousVote || previousVote !== choice) {
-      user.history.push(choice);
-    }
-
-    if (choice === "D. DON'T CLICK !!!") {
-      user.baitCount = (user.baitCount || 0) + 1;
-    }
-
-    user.latestVote = choice;
-    users[key] = user;
-    saveUsers(users);
-
-    sessionStorage.setItem(VOTE_PREVIOUS_KEY, choice);
-    setSelectedVote(choice);
-    const previousChoice = document.getElementById("previous-choice");
-    if (previousChoice) {
-      previousChoice.textContent = choice;
-    }
-
-    if (feedback) {
-      feedback.textContent = `Saved locally because the server is unavailable. Your vote is recorded in local storage.`;
-    }
+  feedback.textContent = `Thanks, ${session.username}! You voted for ${choice}. Total voters: ${votes.total}.`;
+  setSelectedVote(choice);
+  const previousChoice = document.getElementById("previous-choice");
+  if (previousChoice) {
+    previousChoice.textContent = choice;
   }
 }
 
@@ -261,51 +230,45 @@ function setSelectedVote(choice) {
   });
 }
 
-async function renderSecretPage() {
+function jumpscare() {
+  const jumpScare = document.getElementById("jump-scare");
+  const audio = document.getElementById("jump-scare-audio");
+
+  if (audio) {
+    audio.currentTime = 0;
+    audio.play().catch(() => {
+      // user interaction needed for autoplay in some browsers
+    });
+  }
+
+  if (!jumpScare) return;
+  jumpScare.classList.add("visible");
+  setTimeout(() => {
+    jumpScare.classList.remove("visible");
+  }, 2000);
+}
+
+function renderSecretPage() {
+  const users = loadUsers();
   const list = document.getElementById("secret-list");
   const count = document.getElementById("secret-count");
   const notice = document.getElementById("secret-notice");
 
   if (!list || !count) return;
 
-  try {
-    const response = await fetch(VOTES_ENDPOINT);
-    if (!response.ok) {
-      throw new Error("Could not load saved votes.");
-    }
+  const rows = Object.values(users)
+    .sort((a, b) => a.username.localeCompare(b.username))
+    .map((user) => {
+      const history = Array.isArray(user.history) && user.history.length ? user.history.join(",") : user.vote || "NO VOTE";
+      const baitCount = user.baitCount || 0;
+      const baitSuffix = baitCount > 0 ? ` (Fell for bait ${baitCount} ${baitCount === 1 ? "time" : "times"})` : "";
+      return `<div class="secret-row"><span>${user.username}</span><span>${history}${baitSuffix}</span></div>`;
+    })
+    .join("");
 
-    const votes = await response.json();
-    const entries = Object.values(votes).sort((a, b) => a.username.localeCompare(b.username));
-
-    const rows = entries
-      .map((user) => {
-        const history = Array.isArray(user.history) && user.history.length ? user.history.join(", ") : "NO VOTE";
-        const baitSuffix = user.baitCount > 0 ? ` (fell for bait ${user.baitCount} ${user.baitCount === 1 ? "time" : "times"})` : "";
-        return `<div class="secret-row"><span>${user.username}</span><span>${user.latestVote || "none"}</span><span>${history}${baitSuffix}</span></div>`;
-      })
-      .join("");
-
-    list.innerHTML = rows || "<p class='small'>No saved votes yet.</p>";
-    count.textContent = `Saved voters: ${entries.length}`;
-    if (notice) {
-      notice.textContent = `This page reads vote data from the repository-backed server file.`;
-    }
-  } catch (err) {
-    const users = loadUsers();
-    const entries = Object.values(users).sort((a, b) => a.username.localeCompare(b.username));
-    const rows = entries
-      .map((user) => {
-        const history = Array.isArray(user.history) && user.history.length ? user.history.join(", ") : "NO VOTE";
-        const baitSuffix = user.baitCount > 0 ? ` (fell for bait ${user.baitCount} ${user.baitCount === 1 ? "time" : "times"})` : "";
-        return `<div class="secret-row"><span>${user.username}</span><span>${user.latestVote || "none"}</span><span>${history}${baitSuffix}</span></div>`;
-      })
-      .join("");
-
-    list.innerHTML = rows || "<p class='small'>No saved votes yet.</p>";
-    count.textContent = `Saved voters (local fallback): ${entries.length}`;
-    if (notice) {
-      notice.textContent = "Showing saved votes from local storage because the server is unavailable.";
-    }
+  list.innerHTML = rows || "<p class='small'>No saved users.</p>";
+  count.textContent = `Stored accounts: ${Object.values(users).length}`;
+  if (notice) {
+    notice.textContent = `Fell for DON'T CLICK: ${Object.values(users).filter((u) => u.baitCount > 0).length}`;
   }
 }
-
