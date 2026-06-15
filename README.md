@@ -1,6 +1,3 @@
-# About this project
-- This the program i remixed from my friend.
-- Just wanna to troll you guys😝.
+# Vote Who Ming En Love
 
-## Warning ⚠️⚠️
-- This project got jump scare element. Pls prepare before enter.
+A static voting site built for GitHub Pages.

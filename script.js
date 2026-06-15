@@ -1,6 +1,5 @@
 ﻿const USERS_KEY = "voteWhoMing_users";
 const CURRENT_USER_KEY = "voteWhoMing_currentUser";
-const VOTE_KEY = "voteWhoMing_votes";
 
 window.addEventListener("load", () => {
   if (document.body.contains(document.getElementById("login-card"))) {
@@ -170,31 +169,7 @@ function vote(choice) {
   const users = loadUsers();
   const userKey = session.username.toLowerCase();
   const user = users[userKey] || { username: session.username, password: "", vote: null, history: [], baitCount: 0 };
-  const votes = JSON.parse(localStorage.getItem(VOTE_KEY) || "{}");
-
-  if (!votes.total) {
-    votes.total = 0;
-  }
-
   const previousVote = user.vote || null;
-  if (previousVote === choice) {
-    setSelectedVote(choice);
-    const previousChoice = document.getElementById("previous-choice");
-    if (previousChoice) {
-      previousChoice.textContent = choice;
-    }
-    feedback.textContent = `You already selected ${choice}.`;
-    return;
-  }
-
-  if (previousVote) {
-    votes[previousVote] = Math.max((votes[previousVote] || 1) - 1, 0);
-  } else {
-    votes.total += 1;
-  }
-
-  votes[choice] = (votes[choice] || 0) + 1;
-  localStorage.setItem(VOTE_KEY, JSON.stringify(votes));
 
   if (!Array.isArray(user.history)) {
     user.history = [];
@@ -211,7 +186,10 @@ function vote(choice) {
   users[userKey] = user;
   saveUsers(users);
 
-  feedback.textContent = `Thanks, ${session.username}! You voted for ${choice}. Total voters: ${votes.total}.`;
+  const total = Object.values(users).filter((savedUser) => savedUser.vote).length;
+  feedback.textContent = previousVote === choice
+    ? `You already selected ${choice}. Total voters: ${total}.`
+    : `Thanks, ${session.username}! You voted for ${choice}. Total voters: ${total}.`;
   setSelectedVote(choice);
   const previousChoice = document.getElementById("previous-choice");
   if (previousChoice) {
@@ -249,26 +227,32 @@ function jumpscare() {
 }
 
 function renderSecretPage() {
-  const users = loadUsers();
+  const users = Object.values(loadUsers());
   const list = document.getElementById("secret-list");
   const count = document.getElementById("secret-count");
   const notice = document.getElementById("secret-notice");
 
   if (!list || !count) return;
 
-  const rows = Object.values(users)
+  const rows = users
     .sort((a, b) => a.username.localeCompare(b.username))
     .map((user) => {
-      const history = Array.isArray(user.history) && user.history.length ? user.history.join(",") : user.vote || "NO VOTE";
+      const history = Array.isArray(user.history) && user.history.length ? user.history.join(", ") : user.vote || "NO VOTE";
       const baitCount = user.baitCount || 0;
       const baitSuffix = baitCount > 0 ? ` (Fell for bait ${baitCount} ${baitCount === 1 ? "time" : "times"})` : "";
-      return `<div class="secret-row"><span>${user.username}</span><span>${history}${baitSuffix}</span></div>`;
+      return `<div class="secret-row"><span>${escapeHtml(user.username)}</span><span>${escapeHtml(history)}${baitSuffix}</span></div>`;
     })
     .join("");
 
   list.innerHTML = rows || "<p class='small'>No saved users.</p>";
-  count.textContent = `Stored accounts: ${Object.values(users).length}`;
+  count.textContent = `Stored accounts: ${users.length}`;
   if (notice) {
-    notice.textContent = `Fell for DON'T CLICK: ${Object.values(users).filter((u) => u.baitCount > 0).length}`;
+    notice.textContent = `Fell for DON'T CLICK: ${users.filter((user) => user.baitCount > 0).length}`;
   }
+}
+
+function escapeHtml(value) {
+  const element = document.createElement("span");
+  element.textContent = value;
+  return element.innerHTML;
 }
